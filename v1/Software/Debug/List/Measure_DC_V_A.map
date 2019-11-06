@@ -1,0 +1,65 @@
+RAM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+U_channel_1                                                                       0x0160      10
+I_channel_1                                                                       0x016A      10
+U_channel_2                                                                       0x0174      10
+I_channel_2                                                                       0x017E      10
+sample_U1                                                                         0x0188       4
+sample_U2                                                                         0x018C       4
+sample_I1                                                                         0x0190       4
+sample_I2                                                                         0x0194       4
+averaging_U1                                                                      0x0198       4
+averaging_U2                                                                      0x019C       4
+averaging_I1                                                                      0x01A0       4
+averaging_I2                                                                      0x01A4       4
+adc_U1                                                                            0x01A8       4
+adc_U2                                                                            0x01AC       4
+adc_I1                                                                            0x01B0       4
+adc_I2                                                                            0x01B4       4
+U1                                                                                0x01B8       4
+U2                                                                                0x01BC       4
+I1                                                                                0x01C0       4
+I2                                                                                0x01C4       4
+_base_y                                                                           0x01C8       4
+_seed                                                                             0x01CC       4
+
+EEPROM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                                          Register  Size
+------------------------------------------------------------------------------------------------
+sample                                                                            R5           1
+count                                                                             R4           1
+adc_input                                                                         R7           1
+A1                                                                                R8,R9        2
+A2                                                                                R10,R11      2
+_lcd_x                                                                            R6           1
+_lcd_y                                                                            R13          1
+_lcd_maxx                                                                         R12          1
+
+FLASH Allocation [words]
+Function                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+timer0_ovf_isr                                                                    0x00073    523
+main                                                                              0x0027E     39
+_lcd_write_nibble_G100                                                            0x002A5     14
+_lcd_write_data                                                                   0x002B3     12
+lcd_gotoxy                                                                        0x002BF     13
+lcd_clear                                                                         0x002CC     10
+lcd_putchar                                                                       0x002D6     21
+lcd_puts                                                                          0x002EB     15
+lcd_putsf                                                                         0x002FA     18
+lcd_init                                                                          0x0030C     42
+put_buff_G101                                                                     0x00336     45
+_ftoe_G101                                                                        0x00363    138
+_print_G101                                                                       0x003ED    462
+sprintf                                                                           0x005BB     42
+strcpyf                                                                           0x005E5     12
+strlen                                                                            0x005F1     11
+strlenf                                                                           0x005FC     12
+ftrunc                                                                            0x00608     48
+floor                                                                             0x00638     16
+ftoa                                                                              0x00648    130

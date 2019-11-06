@@ -1,0 +1,765 @@
+;/*******************************************************
+;This program was created by the CodeWizardAVR V3.30
+;Automatic Program Generator
+;© Copyright 1998-2017 Pavel Haiduc, HP InfoTech s.r.l.
+;http://www.hpinfotech.com
+;
+;Project : Measure_DC_V_A
+;Version : 1.0
+;Date    : 10.04.2017
+;Author  : Nazarenko Ivan
+;Company :
+;Comments:
+;Устройство 2-х канального измерения
+;напряжения и тока.
+;Диапазон измерения напряжения 0 - 30 В
+;Диапазон измерения тока       0 - 2,5 А
+;
+;
+;Chip type               : ATmega8A
+;Program type            : Application
+;AVR Core Clock frequency: 8,000000 MHz
+;Memory model            : Small
+;External RAM size       : 0
+;Data Stack size         : 256
+;*******************************************************/
+;
+;#include <io.h>         // библиотека для работы с портами ввода-вывода
+;PCODE: $00000000 VOL: 0
+	#ifndef __SLEEP_DEFINED__
+;PCODE: $00000001 VOL: 0
+	#define __SLEEP_DEFINED__
+;PCODE: $00000002 VOL: 0
+	.EQU __se_bit=0x80
+;PCODE: $00000003 VOL: 0
+	.EQU __sm_mask=0x70
+;PCODE: $00000004 VOL: 0
+	.EQU __sm_powerdown=0x20
+;PCODE: $00000005 VOL: 0
+	.EQU __sm_powersave=0x30
+;PCODE: $00000006 VOL: 0
+	.EQU __sm_standby=0x60
+;PCODE: $00000007 VOL: 0
+	.EQU __sm_ext_standby=0x70
+;PCODE: $00000008 VOL: 0
+	.EQU __sm_adc_noise_red=0x10
+;PCODE: $00000009 VOL: 0
+	.SET power_ctrl_reg=mcucr
+;PCODE: $0000000A VOL: 0
+	#endif
+;PCODE: $0000000B VOL: 0
+;PCODE: $0000000C VOL: 0
+;#include <delay.h>      // библиотека задержки
+;
+;// Alphanumeric LCD functions
+;#include <alcd.h>       // библиотека для работы с дисплеем
+;
+;#include <stdio.h>      // библиотека для дисплея, sprintf не будет работать без нее
+;
+;// Voltage Reference: Int., cap. on AREF
+;#define ADC_VREF_TYPE ((1<<REFS1) | (1<<REFS0) | (0<<ADLAR)) // опорное 2,56 В
+;
+;// ************** Глобальные переменные **************
+;unsigned char sample=0, count=0, adc_input=0;
+;
+;char U_channel_1[10], I_channel_1[10], U_channel_2[10], I_channel_2[10];
+;
+;unsigned int A1=0, A2=0;
+;
+;float sample_U1=0, sample_U2=0, sample_I1=0, sample_I2=0,
+;averaging_U1=0, averaging_U2=0, averaging_I1=0, averaging_I2=0,
+;adc_U1=0, adc_U2=0, adc_I1=0, adc_I2=0,
+;U1=0, U2=0, I1=0, I2=0;
+;
+;
+;// Timer 0 overflow interrupt service routine
+;interrupt [TIM0_OVF] void timer0_ovf_isr(void)
+; 0000 0035 {
+
+	.CSEG
+;PCODE: $0000000D VOL: 0
+;PCODE: $0000000E VOL: 0
+; 0000 0036 
+; 0000 0037  TCCR0=0x00; // останавливаем таймер T0 на время выполнения кода
+;PCODE: $0000000F VOL: 0
+;PCODE: $00000010 VOL: 0
+; 0000 0038  TCNT0=0x00; // обнуляем счетный регистр таймера T0
+;PCODE: $00000011 VOL: 0
+;PCODE: $00000012 VOL: 0
+; 0000 0039 // ************ АЦП ************
+; 0000 003A // Опрос 4 каналов
+; 0000 003B while(adc_input<4) // остаемя в цикле пока не опросим все 4 канала АЦП
+;PCODE: $00000013 VOL: 0
+;PCODE: $00000014 VOL: 0
+;PCODE: $00000015 VOL: 0
+;PCODE: $00000016 VOL: 0
+; 0000 003C     {
+; 0000 003D      ADMUX=((adc_input) | (ADC_VREF_TYPE & 0xFF)); // выбираем канал
+;PCODE: $00000017 VOL: 0
+;PCODE: $00000018 VOL: 0
+;PCODE: $00000019 VOL: 0
+; 0000 003E      // Начать преобразование АЦП
+; 0000 003F      ADCSRA|=(1<<ADSC);
+;PCODE: $0000001A VOL: 0
+;PCODE: $0000001B VOL: 0
+; 0000 0040      // ждем, пока АЦП закончит преобразование (ADIF = 0)
+; 0000 0041      while ((ADCSRA & (1<<ADIF))==0);
+;PCODE: $0000001C VOL: 0
+;PCODE: $0000001D VOL: 0
+;PCODE: $0000001E VOL: 0
+;PCODE: $0000001F VOL: 0
+;PCODE: $00000020 VOL: 0
+;PCODE: $00000021 VOL: 0
+; 0000 0042      // сбрасываем ADIF, флаг прерываения окончания преобразования
+; 0000 0043      ADCSRA|=(1<<ADIF);
+;PCODE: $00000022 VOL: 0
+;PCODE: $00000023 VOL: 0
+; 0000 0044 
+; 0000 0045      // Чтение результата преобразования канала АЦП
+; 0000 0046      switch(adc_input)
+;PCODE: $00000024 VOL: 0
+; 0000 0047           {
+; 0000 0048            case 0:{sample_U1+=ADCW; break;} // прибавляем к счетчику оверсемплинга
+;PCODE: $00000025 VOL: 0
+;PCODE: $00000026 VOL: 0
+;PCODE: $00000027 VOL: 0
+;PCODE: $00000028 VOL: 0
+;PCODE: $00000029 VOL: 0
+;PCODE: $0000002A VOL: 0
+;PCODE: $0000002B VOL: 0
+;PCODE: $0000002C VOL: 0
+; 0000 0049            case 1:{sample_I1+=ADCW; break;}
+;PCODE: $0000002D VOL: 0
+;PCODE: $0000002E VOL: 0
+;PCODE: $0000002F VOL: 0
+;PCODE: $00000030 VOL: 0
+;PCODE: $00000031 VOL: 0
+;PCODE: $00000032 VOL: 0
+;PCODE: $00000033 VOL: 0
+;PCODE: $00000034 VOL: 0
+;PCODE: $00000035 VOL: 0
+; 0000 004A            case 2:{sample_U2+=ADCW; break;}
+;PCODE: $00000036 VOL: 0
+;PCODE: $00000037 VOL: 0
+;PCODE: $00000038 VOL: 0
+;PCODE: $00000039 VOL: 0
+;PCODE: $0000003A VOL: 0
+;PCODE: $0000003B VOL: 0
+;PCODE: $0000003C VOL: 0
+;PCODE: $0000003D VOL: 0
+;PCODE: $0000003E VOL: 0
+; 0000 004B            case 3:{sample_I2+=ADCW; break;}
+;PCODE: $0000003F VOL: 0
+;PCODE: $00000040 VOL: 0
+;PCODE: $00000041 VOL: 0
+;PCODE: $00000042 VOL: 0
+;PCODE: $00000043 VOL: 0
+;PCODE: $00000044 VOL: 0
+;PCODE: $00000045 VOL: 0
+;PCODE: $00000046 VOL: 0
+;PCODE: $00000047 VOL: 0
+; 0000 004C           }
+;PCODE: $00000048 VOL: 0
+; 0000 004D      adc_input++;
+;PCODE: $00000049 VOL: 0
+; 0000 004E     }
+;PCODE: $0000004A VOL: 0
+;PCODE: $0000004B VOL: 0
+; 0000 004F 
+; 0000 0050   adc_input=0;// выставляем начальный канал АЦП
+;PCODE: $0000004C VOL: 0
+; 0000 0051 
+; 0000 0052 
+; 0000 0053 // *** Оверсемплинг АЦП ( 4,096 мс ) *** (16 выборок * через каждые 256 мкс)
+; 0000 0054    sample++;
+;PCODE: $0000004D VOL: 0
+; 0000 0055 if(sample==16)
+;PCODE: $0000004E VOL: 0
+;PCODE: $0000004F VOL: 0
+;PCODE: $00000050 VOL: 0
+; 0000 0056   {
+; 0000 0057    count++;
+;PCODE: $00000051 VOL: 0
+; 0000 0058    sample=0;
+;PCODE: $00000052 VOL: 0
+; 0000 0059 
+; 0000 005A    sample_U1=sample_U1 / 4;
+;PCODE: $00000053 VOL: 0
+;PCODE: $00000054 VOL: 0
+;PCODE: $00000055 VOL: 0
+;PCODE: $00000056 VOL: 0
+; 0000 005B    averaging_U1+=sample_U1;
+;PCODE: $00000057 VOL: 0
+;PCODE: $00000058 VOL: 0
+;PCODE: $00000059 VOL: 0
+;PCODE: $0000005A VOL: 0
+; 0000 005C 
+; 0000 005D    sample_I1=sample_I1 / 4;
+;PCODE: $0000005B VOL: 0
+;PCODE: $0000005C VOL: 0
+;PCODE: $0000005D VOL: 0
+;PCODE: $0000005E VOL: 0
+; 0000 005E    averaging_I1+=sample_I1;
+;PCODE: $0000005F VOL: 0
+;PCODE: $00000060 VOL: 0
+;PCODE: $00000061 VOL: 0
+;PCODE: $00000062 VOL: 0
+; 0000 005F 
+; 0000 0060    sample_U2=sample_U2 / 4;
+;PCODE: $00000063 VOL: 0
+;PCODE: $00000064 VOL: 0
+;PCODE: $00000065 VOL: 0
+;PCODE: $00000066 VOL: 0
+; 0000 0061    averaging_U2+=sample_U2;
+;PCODE: $00000067 VOL: 0
+;PCODE: $00000068 VOL: 0
+;PCODE: $00000069 VOL: 0
+;PCODE: $0000006A VOL: 0
+; 0000 0062 
+; 0000 0063    sample_I2=sample_I2 / 4;
+;PCODE: $0000006B VOL: 0
+;PCODE: $0000006C VOL: 0
+;PCODE: $0000006D VOL: 0
+;PCODE: $0000006E VOL: 0
+; 0000 0064    averaging_I2+=sample_I2;
+;PCODE: $0000006F VOL: 0
+;PCODE: $00000070 VOL: 0
+;PCODE: $00000071 VOL: 0
+;PCODE: $00000072 VOL: 0
+; 0000 0065                                                                                                                          ...
+; 0000 0066    sample_U1=0;
+;PCODE: $00000073 VOL: 0
+;PCODE: $00000074 VOL: 0
+; 0000 0067    sample_I1=0;
+;PCODE: $00000075 VOL: 0
+;PCODE: $00000076 VOL: 0
+; 0000 0068    sample_U2=0;
+;PCODE: $00000077 VOL: 0
+;PCODE: $00000078 VOL: 0
+; 0000 0069    sample_I2=0;
+;PCODE: $00000079 VOL: 0
+;PCODE: $0000007A VOL: 0
+; 0000 006A }
+; 0000 006B 
+; 0000 006C // *** Усреднение измерения оверсемплинга (обновления данных на дисплее) ( 262,144 мс )
+; 0000 006D // *** (64 выборок * через каждые 4,096 мс оверсемплинга)
+; 0000 006E  if(count==64)
+;PCODE: $0000007B VOL: 0
+;PCODE: $0000007C VOL: 0
+;PCODE: $0000007D VOL: 0
+;PCODE: $0000007E VOL: 0
+; 0000 006F    {
+; 0000 0070     count=0;
+;PCODE: $0000007F VOL: 0
+; 0000 0071 
+; 0000 0072     adc_U1 = averaging_U1 / 64;
+;PCODE: $00000080 VOL: 0
+;PCODE: $00000081 VOL: 0
+;PCODE: $00000082 VOL: 0
+;PCODE: $00000083 VOL: 0
+; 0000 0073     adc_I1 = averaging_I1 / 64;
+;PCODE: $00000084 VOL: 0
+;PCODE: $00000085 VOL: 0
+;PCODE: $00000086 VOL: 0
+;PCODE: $00000087 VOL: 0
+; 0000 0074     adc_U2 = averaging_U2 / 64;
+;PCODE: $00000088 VOL: 0
+;PCODE: $00000089 VOL: 0
+;PCODE: $0000008A VOL: 0
+;PCODE: $0000008B VOL: 0
+; 0000 0075     adc_I2 = averaging_I2 / 64;
+;PCODE: $0000008C VOL: 0
+;PCODE: $0000008D VOL: 0
+;PCODE: $0000008E VOL: 0
+;PCODE: $0000008F VOL: 0
+; 0000 0076                                                                                                                          ...
+; 0000 0077     averaging_U1=0;
+;PCODE: $00000090 VOL: 0
+;PCODE: $00000091 VOL: 0
+; 0000 0078     averaging_I1=0;
+;PCODE: $00000092 VOL: 0
+;PCODE: $00000093 VOL: 0
+; 0000 0079     averaging_U2=0;
+;PCODE: $00000094 VOL: 0
+;PCODE: $00000095 VOL: 0
+; 0000 007A     averaging_I2=0;
+;PCODE: $00000096 VOL: 0
+;PCODE: $00000097 VOL: 0
+; 0000 007B 
+; 0000 007C      // *** Обработка измеренных данных ***
+; 0000 007D 
+; 0000 007E     if(I1>0.0) // если ток в канале 1 больше 0
+;PCODE: $00000098 VOL: 0
+;PCODE: $00000099 VOL: 0
+;PCODE: $0000009A VOL: 0
+; 0000 007F      {
+; 0000 0080       I1 = (adc_I1 * 0.000625)-0.015;        // формула для расчета тока в 1 канале
+;PCODE: $0000009B VOL: 0
+;PCODE: $0000009C VOL: 0
+;PCODE: $0000009D VOL: 0
+;PCODE: $0000009E VOL: 0
+;PCODE: $0000009F VOL: 0
+;PCODE: $000000A0 VOL: 0
+;PCODE: $000000A1 VOL: 0
+;PCODE: $000000A2 VOL: 0
+; 0000 0081                                              // 0,015 срезаем 15 мА, устанавливая этим 0 мА тока, при х.х. выхода Б.П.
+; 0000 0082                                              // 0,000625 константа (2,56В/4096(12ббитное разрешение)=0,000625)
+; 0000 0083 
+; 0000 0084       U1 = ((adc_U1 * 0.000625)*7)-I1*0.112; // вычисляем напряжение с учетом вычета потерь на датчике тока в канале 1
+;PCODE: $000000A3 VOL: 0
+;PCODE: $000000A4 VOL: 0
+;PCODE: $000000A5 VOL: 0
+;PCODE: $000000A6 VOL: 0
+;PCODE: $000000A7 VOL: 0
+;PCODE: $000000A8 VOL: 0
+;PCODE: $000000A9 VOL: 0
+;PCODE: $000000AA VOL: 0
+;PCODE: $000000AB VOL: 0
+;PCODE: $000000AC VOL: 0
+;PCODE: $000000AD VOL: 0
+;PCODE: $000000AE VOL: 0
+;PCODE: $000000AF VOL: 0
+; 0000 0085      }
+; 0000 0086 
+; 0000 0087     else                                     // если 0 то уста. 0 на диспле
+;PCODE: $000000B0 VOL: 0
+;PCODE: $000000B1 VOL: 0
+; 0000 0088      {
+; 0000 0089      I1=0;
+;PCODE: $000000B2 VOL: 0
+;PCODE: $000000B3 VOL: 0
+; 0000 008A      U1 = (adc_U1 * 0.000625)*7;             // напряжение холостого хода в канале 1
+;PCODE: $000000B4 VOL: 0
+;PCODE: $000000B5 VOL: 0
+;PCODE: $000000B6 VOL: 0
+;PCODE: $000000B7 VOL: 0
+;PCODE: $000000B8 VOL: 0
+;PCODE: $000000B9 VOL: 0
+; 0000 008B      }
+;PCODE: $000000BA VOL: 0
+; 0000 008C 
+; 0000 008D 
+; 0000 008E 
+; 0000 008F    if(I2>0.0) // если ток в канале 2 больше 0
+;PCODE: $000000BB VOL: 0
+;PCODE: $000000BC VOL: 0
+;PCODE: $000000BD VOL: 0
+; 0000 0090      {
+; 0000 0091       I2 = (adc_I2 * 0.000625)-0.015;        // формула для расчета тока в 2 канале
+;PCODE: $000000BE VOL: 0
+;PCODE: $000000BF VOL: 0
+;PCODE: $000000C0 VOL: 0
+;PCODE: $000000C1 VOL: 0
+;PCODE: $000000C2 VOL: 0
+;PCODE: $000000C3 VOL: 0
+;PCODE: $000000C4 VOL: 0
+;PCODE: $000000C5 VOL: 0
+; 0000 0092                                              // 0,015 срезаем 15 мА, устанавливая этим 0 мА тока, при х.х. выхода Б.П.
+; 0000 0093 
+; 0000 0094       U2 = ((adc_U2 * 0.000625)*7)-I2*0.112; // вычисляем напряжение с учетом вычета потерь на датчике тока в канале 2
+;PCODE: $000000C6 VOL: 0
+;PCODE: $000000C7 VOL: 0
+;PCODE: $000000C8 VOL: 0
+;PCODE: $000000C9 VOL: 0
+;PCODE: $000000CA VOL: 0
+;PCODE: $000000CB VOL: 0
+;PCODE: $000000CC VOL: 0
+;PCODE: $000000CD VOL: 0
+;PCODE: $000000CE VOL: 0
+;PCODE: $000000CF VOL: 0
+;PCODE: $000000D0 VOL: 0
+;PCODE: $000000D1 VOL: 0
+;PCODE: $000000D2 VOL: 0
+; 0000 0095      }
+; 0000 0096 
+; 0000 0097     else                                     // если 0 то уста. 0 на диспле
+;PCODE: $000000D3 VOL: 0
+;PCODE: $000000D4 VOL: 0
+; 0000 0098      {
+; 0000 0099       I2=0;
+;PCODE: $000000D5 VOL: 0
+;PCODE: $000000D6 VOL: 0
+; 0000 009A       U2 = (adc_U2 * 0.000625)*7;            // напряжение холостого хода в канале 2
+;PCODE: $000000D7 VOL: 0
+;PCODE: $000000D8 VOL: 0
+;PCODE: $000000D9 VOL: 0
+;PCODE: $000000DA VOL: 0
+;PCODE: $000000DB VOL: 0
+;PCODE: $000000DC VOL: 0
+; 0000 009B      }
+;PCODE: $000000DD VOL: 0
+; 0000 009C 
+; 0000 009D 
+; 0000 009E     if(U1<0.0) // на случай если напряжение будет отрицательно, чтобы не слетали знакоместа на дисплее
+;PCODE: $000000DE VOL: 0
+;PCODE: $000000DF VOL: 0
+;PCODE: $000000E0 VOL: 0
+; 0000 009F       {
+; 0000 00A0        U1=0;
+;PCODE: $000000E1 VOL: 0
+;PCODE: $000000E2 VOL: 0
+; 0000 00A1       }
+; 0000 00A2 
+; 0000 00A3     if(U2<0.0) // на случай если напряжение будет отрицательно, чтобы не слетали знакоместа на дисплее
+;PCODE: $000000E3 VOL: 0
+;PCODE: $000000E4 VOL: 0
+;PCODE: $000000E5 VOL: 0
+;PCODE: $000000E6 VOL: 0
+; 0000 00A4       {
+; 0000 00A5        U2=0;
+;PCODE: $000000E7 VOL: 0
+;PCODE: $000000E8 VOL: 0
+; 0000 00A6       }
+; 0000 00A7 
+; 0000 00A8     // Вывод на дисплей напряжения в канале 1
+; 0000 00A9     lcd_gotoxy(0,0);
+;PCODE: $000000E9 VOL: 0
+;PCODE: $000000EA VOL: 0
+;PCODE: $000000EB VOL: 0
+;PCODE: $000000EC VOL: 0
+;PCODE: $000000ED VOL: 0
+; 0000 00AA 
+; 0000 00AB     if (U1>9.99)
+;PCODE: $000000EE VOL: 0
+;PCODE: $000000EF VOL: 0
+;PCODE: $000000F0 VOL: 0
+;PCODE: $000000F1 VOL: 0
+; 0000 00AC       {
+; 0000 00AD        sprintf(U_channel_1, "U=%.1fB",U1 );
+;PCODE: $000000F2 VOL: 0
+;PCODE: $000000F3 VOL: 0
+;PCODE: $000000F4 VOL: 0
+;PCODE: $000000F5 VOL: 0
+;PCODE: $000000F6 VOL: 0
+;PCODE: $000000F7 VOL: 0
+;PCODE: $000000F8 VOL: 0
+;PCODE: $000000F9 VOL: 0
+;PCODE: $000000FA VOL: 0
+;PCODE: $000000FB VOL: 0
+;PCODE: $000000FC VOL: 0
+; 0000 00AE       }
+; 0000 00AF 
+; 0000 00B0     else
+;PCODE: $000000FD VOL: 0
+;PCODE: $000000FE VOL: 0
+; 0000 00B1       {
+; 0000 00B2        sprintf(U_channel_1, "U=%.2fB",U1 );
+;PCODE: $000000FF VOL: 0
+;PCODE: $00000100 VOL: 0
+;PCODE: $00000101 VOL: 0
+;PCODE: $00000102 VOL: 0
+;PCODE: $00000103 VOL: 0
+;PCODE: $00000104 VOL: 0
+;PCODE: $00000105 VOL: 0
+;PCODE: $00000106 VOL: 0
+;PCODE: $00000107 VOL: 0
+;PCODE: $00000108 VOL: 0
+;PCODE: $00000109 VOL: 0
+; 0000 00B3       }
+;PCODE: $0000010A VOL: 0
+; 0000 00B4 
+; 0000 00B5     lcd_puts(U_channel_1);
+;PCODE: $0000010B VOL: 0
+;PCODE: $0000010C VOL: 0
+; 0000 00B6 
+; 0000 00B7     // Вывод на дисплей тока в канале 1
+; 0000 00B8     lcd_gotoxy(0,1);
+;PCODE: $0000010D VOL: 0
+;PCODE: $0000010E VOL: 0
+;PCODE: $0000010F VOL: 0
+;PCODE: $00000110 VOL: 0
+; 0000 00B9     if(I1>0.999)
+;PCODE: $00000111 VOL: 0
+;PCODE: $00000112 VOL: 0
+;PCODE: $00000113 VOL: 0
+;PCODE: $00000114 VOL: 0
+; 0000 00BA       {
+; 0000 00BB        sprintf(I_channel_1, "I=%.2fA",I1 );
+;PCODE: $00000115 VOL: 0
+;PCODE: $00000116 VOL: 0
+;PCODE: $00000117 VOL: 0
+;PCODE: $00000118 VOL: 0
+;PCODE: $00000119 VOL: 0
+;PCODE: $0000011A VOL: 0
+;PCODE: $0000011B VOL: 0
+;PCODE: $0000011C VOL: 0
+;PCODE: $0000011D VOL: 0
+;PCODE: $0000011E VOL: 0
+;PCODE: $0000011F VOL: 0
+; 0000 00BC       }
+; 0000 00BD 
+; 0000 00BE     else
+;PCODE: $00000120 VOL: 0
+;PCODE: $00000121 VOL: 0
+; 0000 00BF       {
+; 0000 00C0        I1=I1*1000;
+;PCODE: $00000122 VOL: 0
+;PCODE: $00000123 VOL: 0
+;PCODE: $00000124 VOL: 0
+;PCODE: $00000125 VOL: 0
+; 0000 00C1        A1=I1;
+;PCODE: $00000126 VOL: 0
+;PCODE: $00000127 VOL: 0
+;PCODE: $00000128 VOL: 0
+; 0000 00C2        sprintf(I_channel_1, "I=%-3dmA",A1 );
+;PCODE: $00000129 VOL: 0
+;PCODE: $0000012A VOL: 0
+;PCODE: $0000012B VOL: 0
+;PCODE: $0000012C VOL: 0
+;PCODE: $0000012D VOL: 0
+;PCODE: $0000012E VOL: 0
+;PCODE: $0000012F VOL: 0
+;PCODE: $00000130 VOL: 0
+;PCODE: $00000131 VOL: 0
+;PCODE: $00000132 VOL: 0
+;PCODE: $00000133 VOL: 0
+;PCODE: $00000134 VOL: 0
+; 0000 00C3       }
+;PCODE: $00000135 VOL: 0
+; 0000 00C4 
+; 0000 00C5     lcd_puts(I_channel_1);
+;PCODE: $00000136 VOL: 0
+;PCODE: $00000137 VOL: 0
+; 0000 00C6 
+; 0000 00C7     // Вывод на дисплей напряжения в канале 2
+; 0000 00C8     lcd_gotoxy(9,0);
+;PCODE: $00000138 VOL: 0
+;PCODE: $00000139 VOL: 0
+;PCODE: $0000013A VOL: 0
+;PCODE: $0000013B VOL: 0
+; 0000 00C9     if (U2>9.99)
+;PCODE: $0000013C VOL: 0
+;PCODE: $0000013D VOL: 0
+;PCODE: $0000013E VOL: 0
+;PCODE: $0000013F VOL: 0
+; 0000 00CA       {
+; 0000 00CB        sprintf(U_channel_2, "U=%.1fB",U2 );
+;PCODE: $00000140 VOL: 0
+;PCODE: $00000141 VOL: 0
+;PCODE: $00000142 VOL: 0
+;PCODE: $00000143 VOL: 0
+;PCODE: $00000144 VOL: 0
+;PCODE: $00000145 VOL: 0
+;PCODE: $00000146 VOL: 0
+;PCODE: $00000147 VOL: 0
+;PCODE: $00000148 VOL: 0
+;PCODE: $00000149 VOL: 0
+;PCODE: $0000014A VOL: 0
+; 0000 00CC       }
+; 0000 00CD 
+; 0000 00CE     else
+;PCODE: $0000014B VOL: 0
+;PCODE: $0000014C VOL: 0
+; 0000 00CF       {
+; 0000 00D0        sprintf(U_channel_2, "U=%.2fB",U2 );
+;PCODE: $0000014D VOL: 0
+;PCODE: $0000014E VOL: 0
+;PCODE: $0000014F VOL: 0
+;PCODE: $00000150 VOL: 0
+;PCODE: $00000151 VOL: 0
+;PCODE: $00000152 VOL: 0
+;PCODE: $00000153 VOL: 0
+;PCODE: $00000154 VOL: 0
+;PCODE: $00000155 VOL: 0
+;PCODE: $00000156 VOL: 0
+;PCODE: $00000157 VOL: 0
+; 0000 00D1       }
+;PCODE: $00000158 VOL: 0
+; 0000 00D2 
+; 0000 00D3     lcd_puts(U_channel_2);
+;PCODE: $00000159 VOL: 0
+;PCODE: $0000015A VOL: 0
+; 0000 00D4 
+; 0000 00D5     // Вывод на дисплей тока в канале 2
+; 0000 00D6     lcd_gotoxy(9,1);
+;PCODE: $0000015B VOL: 0
+;PCODE: $0000015C VOL: 0
+;PCODE: $0000015D VOL: 0
+;PCODE: $0000015E VOL: 0
+; 0000 00D7     if(I2>0.999)
+;PCODE: $0000015F VOL: 0
+;PCODE: $00000160 VOL: 0
+;PCODE: $00000161 VOL: 0
+;PCODE: $00000162 VOL: 0
+; 0000 00D8       {
+; 0000 00D9        sprintf(I_channel_2, "I=%.2fA",I2 );
+;PCODE: $00000163 VOL: 0
+;PCODE: $00000164 VOL: 0
+;PCODE: $00000165 VOL: 0
+;PCODE: $00000166 VOL: 0
+;PCODE: $00000167 VOL: 0
+;PCODE: $00000168 VOL: 0
+;PCODE: $00000169 VOL: 0
+;PCODE: $0000016A VOL: 0
+;PCODE: $0000016B VOL: 0
+;PCODE: $0000016C VOL: 0
+;PCODE: $0000016D VOL: 0
+; 0000 00DA       }
+; 0000 00DB 
+; 0000 00DC     else
+;PCODE: $0000016E VOL: 0
+;PCODE: $0000016F VOL: 0
+; 0000 00DD       {
+; 0000 00DE        I2=I2*1000;
+;PCODE: $00000170 VOL: 0
+;PCODE: $00000171 VOL: 0
+;PCODE: $00000172 VOL: 0
+;PCODE: $00000173 VOL: 0
+; 0000 00DF        A2=I2;
+;PCODE: $00000174 VOL: 0
+;PCODE: $00000175 VOL: 0
+;PCODE: $00000176 VOL: 0
+; 0000 00E0        sprintf(I_channel_2, "I=%-3dmA",A2 );
+;PCODE: $00000177 VOL: 0
+;PCODE: $00000178 VOL: 0
+;PCODE: $00000179 VOL: 0
+;PCODE: $0000017A VOL: 0
+;PCODE: $0000017B VOL: 0
+;PCODE: $0000017C VOL: 0
+;PCODE: $0000017D VOL: 0
+;PCODE: $0000017E VOL: 0
+;PCODE: $0000017F VOL: 0
+;PCODE: $00000180 VOL: 0
+;PCODE: $00000181 VOL: 0
+;PCODE: $00000182 VOL: 0
+; 0000 00E1       }
+;PCODE: $00000183 VOL: 0
+; 0000 00E2 
+; 0000 00E3     lcd_puts(I_channel_2);
+;PCODE: $00000184 VOL: 0
+;PCODE: $00000185 VOL: 0
+; 0000 00E4 
+; 0000 00E5    }
+; 0000 00E6 
+; 0000 00E7    TCCR0=(0<<CS02) | (1<<CS01) | (0<<CS00);  // возобновляем работу таймера T0
+;PCODE: $00000186 VOL: 0
+;PCODE: $00000187 VOL: 0
+;PCODE: $00000188 VOL: 0
+; 0000 00E8 }
+;PCODE: $00000189 VOL: 0
+;PCODE: $0000018A VOL: 0
+;PCODE: $0000018B VOL: 0
+;
+;
+;
+;void main(void)
+; 0000 00ED {
+;PCODE: $0000018C VOL: 0
+; 0000 00EE // Declare your local variables here
+; 0000 00EF 
+; 0000 00F0 // Input/Output Ports initialization
+; 0000 00F1 // Port C initialization
+; 0000 00F2 // Function: Bit6=Out Bit5=Out Bit4=Out Bit3=In Bit2=In Bit1=In Bit0=In
+; 0000 00F3 DDRC=(1<<DDC6) | (1<<DDC5) | (1<<DDC4) | (0<<DDC3) | (0<<DDC2) | (0<<DDC1) | (0<<DDC0);
+;PCODE: $0000018D VOL: 0
+;PCODE: $0000018E VOL: 0
+; 0000 00F4 // State: Bit6=0 Bit5=0 Bit4=0 Bit3=T Bit2=T Bit1=T Bit0=T
+; 0000 00F5 PORTC=(0<<PORTC6) | (0<<PORTC5) | (0<<PORTC4) | (0<<PORTC3) | (0<<PORTC2) | (0<<PORTC1) | (0<<PORTC0);
+;PCODE: $0000018F VOL: 0
+;PCODE: $00000190 VOL: 0
+; 0000 00F6 
+; 0000 00F7 // Port D initialization
+; 0000 00F8 // Function: Bit7=In Bit6=In Bit5=In Bit4=In Bit3=In Bit2=In Bit1=In Bit0=In
+; 0000 00F9 DDRD=(0<<DDD7) | (0<<DDD6) | (0<<DDD5) | (0<<DDD4) | (0<<DDD3) | (0<<DDD2) | (0<<DDD1) | (0<<DDD0);
+;PCODE: $00000191 VOL: 0
+;PCODE: $00000192 VOL: 0
+; 0000 00FA // State: Bit7=T Bit6=T Bit5=T Bit4=T Bit3=T Bit2=T Bit1=T Bit0=T
+; 0000 00FB PORTD=(0<<PORTD7) | (0<<PORTD6) | (0<<PORTD5) | (0<<PORTD4) | (0<<PORTD3) | (0<<PORTD2) | (0<<PORTD1) | (0<<PORTD0);
+;PCODE: $00000193 VOL: 0
+;PCODE: $00000194 VOL: 0
+; 0000 00FC 
+; 0000 00FD // Timer/Counter 0 initialization
+; 0000 00FE // Clock source: System Clock
+; 0000 00FF // Clock value: 1000,000 kHz
+; 0000 0100 // Timer period: 0,256 ms
+; 0000 0101 TCCR0=(0<<CS02) | (1<<CS01) | (0<<CS00);
+;PCODE: $00000195 VOL: 0
+;PCODE: $00000196 VOL: 0
+; 0000 0102 
+; 0000 0103 // Timer(s)/Counter(s) Interrupt(s) initialization
+; 0000 0104 TIMSK=(0<<OCIE2) | (0<<TOIE2) | (0<<TICIE1) | (0<<OCIE1A) | (0<<OCIE1B) | (0<<TOIE1) | (1<<TOIE0);
+;PCODE: $00000197 VOL: 0
+;PCODE: $00000198 VOL: 0
+; 0000 0105 
+; 0000 0106 // Analog Comparator initialization
+; 0000 0107 // Analog Comparator: Off
+; 0000 0108 // The Analog Comparator's positive input is
+; 0000 0109 // connected to the AIN0 pin
+; 0000 010A // The Analog Comparator's negative input is
+; 0000 010B // connected to the AIN1 pin
+; 0000 010C ACSR=(1<<ACD) | (0<<ACBG) | (0<<ACO) | (0<<ACI) | (0<<ACIE) | (0<<ACIC) | (0<<ACIS1) | (0<<ACIS0);
+;PCODE: $00000199 VOL: 0
+;PCODE: $0000019A VOL: 0
+; 0000 010D 
+; 0000 010E // ADC initialization
+; 0000 010F // ADC Clock frequency: 125,000 kHz
+; 0000 0110 // ADC Voltage Reference: AREF pin
+; 0000 0111 ADMUX=ADC_VREF_TYPE;
+;PCODE: $0000019B VOL: 0
+;PCODE: $0000019C VOL: 0
+; 0000 0112 ADCSRA=(1<<ADEN) | (0<<ADSC) | (0<<ADFR) | (0<<ADIF) | (0<<ADIE) | (1<<ADPS2) | (1<<ADPS1) | (0<<ADPS0);
+;PCODE: $0000019D VOL: 0
+;PCODE: $0000019E VOL: 0
+; 0000 0113 SFIOR=(0<<ACME);
+;PCODE: $0000019F VOL: 0
+;PCODE: $000001A0 VOL: 0
+; 0000 0114 
+; 0000 0115 // Alphanumeric LCD initialization
+; 0000 0116 // Connections are specified in the
+; 0000 0117 // Project|Configure|C Compiler|Libraries|Alphanumeric LCD menu:
+; 0000 0118 // RS - PORTD Bit 0
+; 0000 0119 // RD - PORTD Bit 1
+; 0000 011A // EN - PORTD Bit 2
+; 0000 011B // D4 - PORTD Bit 4
+; 0000 011C // D5 - PORTD Bit 5
+; 0000 011D // D6 - PORTD Bit 6
+; 0000 011E // D7 - PORTD Bit 7
+; 0000 011F // Characters/line: 16
+; 0000 0120 lcd_init(16);
+;PCODE: $000001A1 VOL: 0
+;PCODE: $000001A2 VOL: 0
+; 0000 0121 
+; 0000 0122 lcd_gotoxy(2,0);
+;PCODE: $000001A3 VOL: 0
+;PCODE: $000001A4 VOL: 0
+;PCODE: $000001A5 VOL: 0
+;PCODE: $000001A6 VOL: 0
+; 0000 0123 lcd_putsf("Developed in");
+;PCODE: $000001A7 VOL: 0
+;PCODE: $000001A8 VOL: 0
+;PCODE: $000001A9 VOL: 0
+; 0000 0124 lcd_gotoxy(3,1);
+;PCODE: $000001AA VOL: 0
+;PCODE: $000001AB VOL: 0
+;PCODE: $000001AC VOL: 0
+;PCODE: $000001AD VOL: 0
+; 0000 0125 lcd_putsf("NKPT-2017");
+;PCODE: $000001AE VOL: 0
+;PCODE: $000001AF VOL: 0
+;PCODE: $000001B0 VOL: 0
+; 0000 0126 delay_ms(2000);
+;PCODE: $000001B1 VOL: 0
+;PCODE: $000001B2 VOL: 0
+; 0000 0127 lcd_clear();
+;PCODE: $000001B3 VOL: 0
+; 0000 0128 
+; 0000 0129 TCNT0=0x00;
+;PCODE: $000001B4 VOL: 0
+;PCODE: $000001B5 VOL: 0
+; 0000 012A // Globally enable interrupts
+; 0000 012B #asm("sei")
+;PCODE: $000001B6 VOL: 0
+	sei
+;PCODE: $000001B7 VOL: 0
+; 0000 012C 
+; 0000 012D while (1)
+;PCODE: $000001B8 VOL: 0
+; 0000 012E       {
+; 0000 012F 
+; 0000 0130       }
+;PCODE: $000001B9 VOL: 0
+;PCODE: $000001BA VOL: 0
+; 0000 0131 }
+;PCODE: $000001BB VOL: 0
+;PCODE: $000001BC VOL: 0
+;PCODE: $000001BD VOL: 0
